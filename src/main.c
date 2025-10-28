@@ -12,17 +12,35 @@ typedef uint32_t u32;
 
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
-#define MAP_WIDTH 6
-#define MAP_HEIGHT 7
+#define MAP_WIDTH 15
+#define MAP_HEIGHT 15
+
+// static u8 MAPDATA[MAP_HEIGHT * MAP_WIDTH] = {
+//     1, 3, 1, 3, 1, 3,
+//     3, 0, 0, 0, 0, 1,
+//     1, 0, 2, 2, 0, 3,
+//     3, 0, 0, 0, 0, 1,
+//     1, 0, 4, 4, 0, 3,
+//     3, 0, 0, 4, 0, 1,
+//     1, 3, 1, 3, 1, 3
+// };
 
 static u8 MAPDATA[MAP_HEIGHT * MAP_WIDTH] = {
-    1, 3, 1, 3, 1, 3,
-    3, 0, 0, 0, 0, 1,
-    1, 0, 2, 2, 0, 3,
-    3, 0, 0, 0, 0, 1,
-    1, 0, 4, 4, 0, 3,
-    3, 0, 0, 4, 0, 1,
-    1, 3, 1, 3, 1, 3
+    1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1,
+    1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+    1, 3, 2, 2, 2, 4, 0, 0, 0, 1, 1, 1, 1, 1, 1,
+    1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+    1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1,
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+
 };
 
 struct {
@@ -63,9 +81,9 @@ int main(/*int argc, char** argv*/) {
     float playerRot = 0.0f;
     float playerFOV = 1.0472f;
 
-    const f32
-        rotspeed = 0.5f * 0.016f,
-        movespeed = 1.0f * 0.016f;
+    const f32 movespeed = 3.0f * 0.016f;
+    const f32 rotspeed  = 1.5f * 0.016f;
+
 
     bool running = true;
     SDL_Event event;
@@ -139,7 +157,7 @@ int main(/*int argc, char** argv*/) {
             // correct fish-eye
             distance *= cosf(angleDuRayon - playerRot);
 
-            float factor = 2.0f; // + grand -> murs + loin
+            float factor = 0.65f; // + grand -> murs + loin
             float hauteurColonne = SCREEN_HEIGHT / (distance * factor);
             int y0 = SCREEN_HEIGHT / 2 - (int)(hauteurColonne / 2);
             int y1 = SCREEN_HEIGHT / 2 + (int)(hauteurColonne / 2);

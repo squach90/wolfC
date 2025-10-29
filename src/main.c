@@ -14,26 +14,30 @@ typedef uint32_t u32;
 #define SCREEN_HEIGHT 480
 #define MAP_WIDTH 15
 #define MAP_HEIGHT 15
-#define MAX_TEXTURES 5
+#define MAX_TEXTURES 15
 #define GUN_FRAMES 5
+#define MAX_DOORS 10
 
-// Map : 0 = empty, 1-5 blue wall
+// Map : 0 = empty, 1-6 blue wall, 11 = doors
 static u8 MAPDATA[MAP_HEIGHT * MAP_WIDTH] = {
     1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,
     1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,
     1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,
-    1,3,2,2,2,4,0,0,0,1,1,1,1,1,1,
+    1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,
     1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+    1,0,0,0,0,11,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,
     1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
     1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-    1,2,1,1,2,1,1,2,1,1,2,1,1,2,1
+    1,2,1,1,2,1,1,3,1,1,2,1,1,2,1
 };
+
+static bool COLLISION_MAP[MAP_HEIGHT * MAP_WIDTH];
+
 
 // Textures Struct
 typedef struct {
@@ -50,6 +54,48 @@ struct {
     u32 pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
     Texture textures[MAX_TEXTURES];
 } state;
+
+
+typedef struct {
+    float x;
+    float y;
+    int textureId;
+    bool visible;
+    float distance;
+    float angle;
+} Sprite;
+
+typedef struct {
+    int x, y;
+    int texNorth;
+    int texSouth;
+    int texWest;
+    int texEast;
+} SpecialBlock;
+
+typedef struct {
+    int x, y;
+    bool isClosed;
+} Door;
+
+
+Door doors[MAX_DOORS];
+int doorCount = 0;
+
+// list of special block (with differents faces)
+SpecialBlock specialBlocks[] = {
+    {5, 8, 1, 10, 1, 1}, // x, y , textuID, textuID, textuID, textuID
+    {5, 6, 10, 1, 1, 1},
+    {9, 8, 1, 10, 1, 1},
+    {9, 6, 10, 1, 1, 1},
+    {5, 13, 1, 10, 1, 1},
+    {5, 11, 10, 1, 1, 1},
+    {9, 13, 1, 10, 1, 1},
+    {9, 11, 10, 1, 1, 1},
+};
+
+int numSpecialBlocks = sizeof(specialBlocks) / sizeof(specialBlocks[0]);
+
 
 SDL_Surface* gHelloWorld = NULL;
 SDL_Texture* gHelloWorldTex = NULL;
@@ -159,19 +205,30 @@ void verline_tex(int x, int y0, int y1, Texture* tex, int texX, f32 wallHeight, 
 
 // Checking collision
 bool check_collision(f32 x, f32 y) {
-    f32 padding = 5.0f; // distance before wall
     int mapX = (int)x;
     int mapY = (int)y;
-    if (mapX < 0 || mapX >= MAP_WIDTH || mapY < 0 || mapY >= MAP_HEIGHT) return true;
-    // Map invert for correct look
-    return MAPDATA[(MAP_HEIGHT - 1 - mapY) * MAP_WIDTH + mapX] != 0;
 
-    if (MAPDATA[(MAP_HEIGHT - 1 - mapY) * MAP_WIDTH + (int)(x + padding)] != 0) return true;
-    if (MAPDATA[(MAP_HEIGHT - 1 - mapY) * MAP_WIDTH + (int)(x - padding)] != 0) return true;
-    if (MAPDATA[(MAP_HEIGHT - 1 - (int)(y + padding)) * MAP_WIDTH + mapX] != 0) return true;
-    if (MAPDATA[(MAP_HEIGHT - 1 - (int)(y - padding)) * MAP_WIDTH + mapX] != 0) return true;
+    if (mapX < 0 || mapX >= MAP_WIDTH || mapY < 0 || mapY >= MAP_HEIGHT)
+        return true; // coll if off map
 
+    return COLLISION_MAP[(MAP_HEIGHT - 1 - mapY) * MAP_WIDTH + mapX];
 }
+
+int getDoorInFront(float playerX, float playerY, float playerRot) {
+    float nx = playerX + cosf(playerRot) * 0.5f;
+    float ny = playerY + sinf(playerRot) * 0.5f;
+
+    for (int i = 0; i < doorCount; i++) {
+        float dx = nx - (doors[i].x + 0.5f);
+        float dy = ny - (doors[i].y + 0.5f);
+        float dist = sqrtf(dx * dx + dy * dy);
+        if (dist < 1.2f) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 
 
 int main(void) {
@@ -191,12 +248,15 @@ int main(void) {
     // load all textures for world
     load_texture_to_slot("assets/bluestone.png", 1);
     load_texture_to_slot("assets/bluestone-grid.png", 2);
-    load_texture_to_slot("assets/bluestone-stand.png", 3);
-    load_texture_to_slot("assets/bluestone-death.png", 4);
-    load_texture_to_slot("assets/bluestone-sign.png", 5);
-    load_texture_to_slot("assets/redbrick.png", 6);
-    load_texture_to_slot("assets/wood.png", 7);
-    load_texture_to_slot("assets/greystone.png", 8);
+    load_texture_to_slot("assets/bluestone-grid-skull.png", 3);
+    load_texture_to_slot("assets/bluestone-stand.png", 4);
+    load_texture_to_slot("assets/bluewall-death.png", 5);
+    load_texture_to_slot("assets/bluewall-sign.png", 6);
+    load_texture_to_slot("assets/redbrick.png", 7);
+    load_texture_to_slot("assets/wood.png", 8);
+    load_texture_to_slot("assets/greystone.png", 9);
+    load_texture_to_slot("assets/doorslot.png", 10);
+    load_texture_to_slot("assets/door.png", 11);
 
     // load textu for gun
     if (!loadGunTextures(state.renderer)) {
@@ -218,6 +278,22 @@ int main(void) {
     bool running = true;
     SDL_Event event;
     u32 lastTime = SDL_GetTicks();
+
+    doors[doorCount++] = (Door){5, 7, true};
+    doors[doorCount++] = (Door){9, 7, false};
+
+
+    for (int i = 0; i < MAP_HEIGHT * MAP_WIDTH; i++) {
+        // default all wall are solid
+        COLLISION_MAP[i] = MAPDATA[i] != 0;
+    }
+
+    for (int i = 0; i < doorCount; i++) {
+        int mapIndex = (MAP_HEIGHT - 1 - doors[i].y) * MAP_WIDTH + doors[i].x;
+        COLLISION_MAP[mapIndex] = doors[i].isClosed;
+    }
+
+
 
     while (running) {
         u32 currentTime = SDL_GetTicks();
@@ -289,27 +365,41 @@ int main(void) {
             f32 hitWallX = (side == 0) ? playerY + perpDist * rayDirY : playerX + perpDist * rayDirX;
             hitWallX -= floorf(hitWallX);
 
-            Texture* tex = (val > 0 && val < MAX_TEXTURES) ? &state.textures[val] : NULL;
+            Texture* tex = NULL;
+
+            // search for special blocks
+            for (int i = 0; i < numSpecialBlocks; i++) {
+                if (mapX == specialBlocks[i].x && mapY == specialBlocks[i].y) {
+                    if (side == 0) tex = (rayDirX > 0) ? &state.textures[specialBlocks[i].texEast]
+                                                      : &state.textures[specialBlocks[i].texWest];
+                    else           tex = (rayDirY > 0) ? &state.textures[specialBlocks[i].texSouth]
+                                                      : &state.textures[specialBlocks[i].texNorth];
+                    break;
+                }
+            }
+
+            // if no special blocks
+            if (!tex && val > 0 && val < MAX_TEXTURES) {
+                tex = &state.textures[val];
+            }
+
+
+
             int texX = 0;
-            if (tex && tex->pixels) {
-                texX = (int)(hitWallX * tex->width);
-                if (texX < 0) texX = 0;
-                if (texX >= tex->width) texX = tex->width - 1;
+            if (tex) {
+                texX = (int)(hitWallX * (float)tex->width);
+                if ((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0))
+                    texX = tex->width - texX - 1;
             }
 
             f32 wallHeight = SCREEN_HEIGHT / perpDist;
             int y0 = SCREEN_HEIGHT / 2 - (int)(wallHeight / 2);
             int y1 = SCREEN_HEIGHT / 2 + (int)(wallHeight / 2);
 
-            u32 fallbackColors[] = {0, 0xFF5555FF, 0xFF55FF55, 0xFFFF5555, 0xFFFFFF55};
-            u32 fallbackColor = (val < 5) ? fallbackColors[val] : 0xFFFFFFFF;
-
-            if (side == 1 && !tex) fallbackColor = (fallbackColor & 0xFF000000) | ((fallbackColor & 0xFEFEFE) >> 1);
-
             f32 lightFactor = 1.0f / (1.0f + perpDist * 0.15f);
             if (lightFactor < 0.4f) lightFactor = 0.4f;
 
-            verline_tex(col, y0, y1, tex, texX, wallHeight, fallbackColor, lightFactor);
+            verline_tex(col, y0, y1, tex, texX, wallHeight, 0xFFFFFFFF, lightFactor);
         }
 
         
@@ -339,8 +429,28 @@ int main(void) {
             gunFrame = 0; // Initial frame if no shoot
         }
 
+        static bool prevSpace = false;
+        bool currSpace = keystate[SDL_SCANCODE_SPACE];
 
+        // when we press
+        if (currSpace && !prevSpace) {
+            int i = getDoorInFront(playerX, playerY, playerRot);
+            if (i != -1) {
+                doors[i].isClosed = !doors[i].isClosed;
 
+                int mapIndex = (MAP_HEIGHT - 1 - doors[i].y) * MAP_WIDTH + doors[i].x;
+
+                // collision = if doors state
+                COLLISION_MAP[mapIndex] = doors[i].isClosed;
+
+                // change texture on the map
+                MAPDATA[mapIndex] = doors[i].isClosed ? 11 : 0; // 11 = closed doors
+            }
+        }
+        prevSpace = currSpace;
+
+        printf("X: %f\n", playerX);
+        printf("Y: %f\n", playerY);
         SDL_UpdateTexture(state.texture, NULL, state.pixels, SCREEN_WIDTH * sizeof(u32));
 
         int winW, winH;
